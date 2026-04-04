@@ -1,46 +1,29 @@
-import streamlit as st
-import numpy as np
-import cv2
-from PIL import Image
-from detector import ObjectDetector
+from flask import Flask, render_template, request
+import os
+from detector import detect_objects  # your function
 
-# Page config
-st.set_page_config(page_title="YOLO Webcam Detection", layout="wide")
+app = Flask(__name__)
 
-# Title
-st.title("🎥 Real-Time Object Detection")
+UPLOAD_FOLDER = "static/uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Load model
-detector = ObjectDetector()
+@app.route("/")
+def home():
+    return render_template("index.html")
 
-st.write("Capture an image using your webcam and detect objects instantly")
+@app.route("/detect", methods=["POST"])
+def detect():
+    if "file" not in request.files:
+        return "No file uploaded"
 
-# Webcam input
-picture = st.camera_input("Take a picture")
+    file = request.files["file"]
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+    file.save(filepath)
 
-if picture is not None:
-    # Convert to image
-    image = Image.open(picture)
+    # Run detection
+    result_path = detect_objects(filepath)
 
-    st.subheader("Captured Image")
-    st.image(image, use_container_width=True)
+    return render_template("result.html", image=result_path)
 
-    # Convert to OpenCV format
-    img = np.array(image)
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-    # Detect objects
-    result = detector.detect(img)
-
-    # Convert back for display
-    result = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
-
-    st.subheader("Detected Output")
-    st.image(result, use_container_width=True)
-
-    # Download button
-    st.download_button(
-        "Download Result",
-        data=cv2.imencode('.jpg', result)[1].tobytes(),
-        file_name="detected.jpg"
-    )
+if __name__ == "__main__":
+    app.run(debug=True)
